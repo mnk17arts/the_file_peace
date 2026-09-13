@@ -1,6 +1,6 @@
-import { createContext, useState, useContext, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { ThemeContext } from './theme-context';
 
-const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
   // Check local storage so it remembers the user's preference on reload
@@ -25,4 +25,3 @@ export const ThemeProvider = ({ children }) => {
   );
 };
 
-export const useTheme = () => useContext(ThemeContext);

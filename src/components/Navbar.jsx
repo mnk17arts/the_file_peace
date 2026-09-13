@@ -1,629 +1,313 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../context/useTheme';
 import Logo from './Logo';
-import { useState } from 'react';
-import {
-  FiLayers,
-  FiScissors,
-  FiRefreshCw,
-  FiImage,
-  FiFileText,
-  FiCode,
-  FiLayout,
-  FiLock,
-  FiUnlock,
-  FiEdit3,
-  FiHash,
-  FiPenTool,
-  FiBookOpen,
-  FiVideo,
-} from "react-icons/fi";
-const toolCategories = [
-  {
-    title: "ORGANIZE PDF",
-    tools: [
-      { title: "Merge PDF", to: "/merge-pdf" ,icon: FiLayers,iconColor :"#6366f1"},
-      { title: "Split PDF", to: "/split-pdf" ,icon: FiScissors,iconColor :"#f1c40f"},
-      { title: "Rotate PDF", to: "/rotate-pdf" ,icon: FiRefreshCw,iconColor :"#3498db"},
-      { title: "Organize PDF", to: "/organize-pdf" ,icon: FiLayout,iconColor :"#e74c3c"},
-    ],
-  },
-  {
-    title: "OPTIMIZE",
-    tools: [
-      { title: "Compress Image", to: "/compress-image" ,icon: FiImage,iconColor :"#f97316"},
-      { title: "Compress Video", to: "/compress-video" ,icon: FiVideo,iconColor :"#8b5cf6"},
-    ],
-  },
-  {
-    title: "CONVERT",
-    tools: [
-      { title: "PDF to Image", to: "/pdf-to-image" ,icon: FiFileText,iconColor :"#f59e0b"},
-      { title: "Image to PDF", to: "/image-to-pdf" ,icon: FiImage,iconColor :"#43f916"},
-      { title: "Convert Image", to: "/convert-image" ,icon: FiImage,iconColor :"#f97316"},
-      { title: "Text & Code to PDF", to: "/text-to-pdf" ,icon: FiCode,iconColor :"#ef4444"},
-      { title: "Markup Converter", to: "/markup-converter" ,icon: FiLayout,iconColor :"#3498db"},
-    ],
-  },
-  {
-    title: "EDIT PDF",
-    tools: [
-      { title: "Add Watermark", to: "/add-watermark" ,icon: FiPenTool,iconColor :"#d61410"},
-      { title: "Page Numbers", to: "/page-numbers" ,icon: FiHash,iconColor :"#3498db"},
-    ],
-  },
-  {
-    title: "PDF SECURITY",
-    tools: [
-      { title: "Protect PDF", to: "/protect-pdf" ,icon: FiLock,iconColor :"#f631e2"},
-    ],
-  },
-  {
-    title: "PDF INTELLIGENCE",
-    tools: [
-      { title: "Read PDF", to: "/pdf-reader" ,icon: FiBookOpen,iconColor :"#10b981"},
-    ],
-  },
-];
+import { CATEGORIES, TOOLS } from '../data/toolsRegistry';
+import { FiSearch, FiCommand, FiGrid, FiBookOpen, FiZap, FiChevronDown, FiX, FiMenu, FiTag } from 'react-icons/fi';
+import WhatsNewModal from './WhatsNewModal';
+
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [showConvertDropdown, setShowConvertDropdown] = useState(false);
+  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  const getResponsiveStyles = () => {
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    
-    return {
-      header: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: isMobile ? "0.75rem 1rem" : "1rem 2rem",
-        backgroundColor: "var(--card-bg)",
-        borderBottom: "1px solid var(--border-color)",
-        position: "relative",
-        flexWrap: "wrap",
-        gap: isMobile ? "0.5rem" : "1rem",
-      },
-      brandLink: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: isMobile ? '0.5rem' : '0.75rem',
-        textDecoration: 'none',
-        color: 'var(--text-color)',
-        fontWeight: 'bold',
-        fontSize: isMobile ? '1rem' : '1.25rem',
-      },
-      brandText: {
-        letterSpacing: '-0.5px',
-      },
-      badge: {
-        fontSize: isMobile ? '0.6rem' : '0.7rem',
-        backgroundColor: 'var(--primary-color)',
-        color: 'white',
-        padding: isMobile ? '0.1rem 0.3rem' : '0.15rem 0.4rem',
-        borderRadius: '4px',
-        fontWeight: '600',
-      },
-      nav: {
-        display: isMobile ? (isMobileMenuOpen ? "flex" : "none") : "flex",
-        alignItems: isMobile ? "stretch" : "center",
-        gap: isMobile ? "0" : "1.5rem",
-        flexDirection: isMobile ? "column" : "row",
-        position: isMobile ? "absolute" : "relative",
-        top: isMobile ? "calc(100% + 10px)" : "auto",
-        left: isMobile ? "0" : "auto",
-        right: isMobile ? "0" : "auto",
-        width: isMobile ? "calc(100vw - 2rem)" : "auto",
-        backgroundColor: isMobile ? "var(--card-bg)" : "transparent",
-        borderTop: isMobile ? "1px solid var(--border-color)" : "none",
-        padding: isMobile ? "1rem" : "0",
-        zIndex: isMobile ? "1000" : "auto",
-        margin: isMobile ? "0 1rem" : "0",
-        borderRadius: isMobile ? "12px" : "0",
-      },
+  const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(false);
+  const [isMac] = useState(() => {
+    if (typeof navigator !== 'undefined') {
+      return /(Mac|iPhone|iPod|iPad)/i.test(navigator.userAgent || navigator.platform);
+    }
+    return false;
+  });
 
-      navLink: {
-        display: "flex",
-        alignItems: "center",
-        gap: "0.75rem",
-        textDecoration: "none",
-        color: "var(--text-color)",
-        fontWeight: 600,
-        fontSize: isMobile ? "0.95rem" : "15px",
-        padding: isMobile ? "0.75rem 1rem" : "10px 0",
-        transition: "color 0.25s ease",
-        cursor: "pointer",
-        borderRadius: isMobile ? "8px" : "0",
-      },
+  const dropdownRef = useRef(null);
+  const closeTimeoutRef = useRef(null);
 
-      navButton: {
-        background: isMobile ? "var(--border-color)" : "transparent",
-        border: "none",
-        color: "var(--text-color)",
-        fontSize: isMobile ? "0.95rem" : "15px",
-        fontWeight: 600,
-        padding: isMobile ? "0.75rem 1rem" : "0",
-        borderRadius: isMobile ? "8px" : "0",
-        cursor: "pointer",
-        transition: "all 0.25s ease",
-        fontFamily: "inherit",
-        textAlign: "left",
-        width: isMobile ? "100%" : "auto",
-      },
-
-      menuToggle: {
-        display: isMobile ? "flex" : "none",
-        flexDirection: "column",
-        gap: "4px",
-        background: "none",
-        border: "none",
-        cursor: "pointer",
-        padding: "0.5rem",
-      },
-      hamburgerLine: {
-        width: "24px",
-        height: "2px",
-        backgroundColor: "var(--text-color)",
-        transition: "all 0.3s ease",
-      },
-
-      themeBtn: {
-        background: "var(--primary-color)",
-        color: "#fff",
-        border: "none",
-        borderRadius: "8px",
-        padding: isMobile ? "6px 10px" : "8px 14px",
-        cursor: "pointer",
-        fontWeight: 600,
-        fontSize: isMobile ? "0.8rem" : "1rem",
-        order: isMobile ? "-1" : "auto",
-      },
-
-      dropdown: {
-        position: isMobile ? "static" : "relative",
-        display: "flex",
-        alignItems: isMobile ? "stretch" : "center",
-        flexDirection: isMobile ? "column" : "row",
-        width: isMobile ? "100%" : "auto",
-      },
-
-      megaMenu: {
-        position: isMobile ? "static" : "absolute",
-        top: isMobile ? "auto" : "calc(100% + 2px)",
-        left: isMobile ? "auto" : "100px",
-        right: isMobile ? "auto" : "50%",
-        transform: isMobile ? "none" : "translateX(-68%)",
-        width: isMobile ? "100%" : "90vw",
-        maxWidth: isMobile ? "100%" : "1050px",
-        background: isMobile ? "transparent" : "var(--card-bg)",
-        border: isMobile ? "none" : "1px solid var(--border-color)",
-        borderRadius: isMobile ? "0" : "22px",
-        padding: isMobile ? "1rem 0 0 0" : "42px 38px",
-        display: "grid",
-        gridTemplateColumns: isMobile ? "1fr" : "repeat(7, minmax(180px,1fr))",
-        columnGap: isMobile ? "0" : "2px",
-        rowGap: isMobile ? "0" : "10px",
-        boxShadow: isMobile ? "none" : "0 20px 60px rgba(0,0,0,.15)",
-        zIndex: 9999,
-        overflow: "visible",
-        maxHeight: isMobile ? "auto" : "70vh",
-        overflowY: isMobile ? "visible" : "auto",
-      },
-      arrow: {
-        display: isMobile ? "none" : "block",
-        position: "absolute",
-        top: isMobile ? "auto" : "-11px",
-        bottom: isMobile ? "-9px" : "auto",
-        left: isMobile ? "50%" : "710px",
-        transform: isMobile ? "translateX(-50%) rotate(45deg)" : "translateX(-50%) rotate(45deg)",
-        width: "18px",
-        height: "18px",
-        background: "var(--card-bg)",
-        borderTop: "1px solid var(--border-color)",
-        borderLeft: "1px solid var(--border-color)",
-        zIndex: 10000,
-      },
-      megaColumn: {
-        display: "flex",
-        flexDirection: "column",
-        gap: isMobile ? "0.25rem" : "8px",
-        borderTop: isMobile ? "1px solid var(--border-color)" : "none",
-        paddingTop: isMobile ? "0.75rem" : "0",
-        marginTop: isMobile ? "0.75rem" : "0",
-      },
-      megaHeading: {
-        fontSize: isMobile ? "0.75rem" : "15px",
-        fontWeight: 700,
-        color: "#7d828d",
-        marginBottom: isMobile ? "0.5rem" : "18px",
-        textTransform: "uppercase",
-        letterSpacing: ".4px",
-        display: isMobile ? "block" : "block",
-      },
-
-      megaItem: {
-        display: "flex",
-        alignItems: "center",
-        gap: isMobile ? "0.5rem" : "12px",
-        padding: isMobile ? "0.4rem 0" : "9px 0",
-        textDecoration: "none",
-        color: "var(--text-color)",
-        fontSize: isMobile ? "0.85rem" : "17px",
-        fontWeight: 500,
-        transition: ".25s ease",
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-        borderRadius: "8px",
-      },
-
-      convertMenu: {
-        position: isMobile ? "static" : "absolute",
-        top: isMobile ? "auto" : "calc(100% + 2px)",
-        left: isMobile ? "auto" : "50%",
-        transform: isMobile ? "none" : "translateX(-50%)",
-        width: isMobile ? "100%" : "650px",
-        background: isMobile ? "transparent" : "var(--card-bg)",
-        border: isMobile ? "none" : "1px solid var(--border-color)",
-        borderRadius: isMobile ? "0" : "18px",
-        padding: isMobile ? "1rem 0 0 0" : "32px",
-        display: "grid",
-        gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)",
-        gap: isMobile ? "1.5rem" : "40px",
-        boxShadow: isMobile ? "none" : "0 18px 50px rgba(0,0,0,.15)",
-        zIndex: 9999,
-        overflow: "visible",
-        maxHeight: isMobile ? "auto" : "70vh",
-        overflowY: isMobile ? "visible" : "auto",
-      },
-
-      convertColumn: {
-        display: "flex",
-        flexDirection: "column",
-        borderTop: isMobile ? "1px solid var(--border-color)" : "none",
-        paddingTop: isMobile ? "1rem" : "0",
-        marginTop: isMobile ? "1rem" : "0",
-      },
-
-      convertHeading: {
-        fontSize: isMobile ? "0.75rem" : "15px",
-        fontWeight: 700,
-        color: "#8b8f98",
-        textTransform: "uppercase",
-        marginBottom: isMobile ? "0.75rem" : "20px",
-      },
-
-      convertItem: {
-        display: "flex",
-        alignItems: "center",
-        gap: isMobile ? "0.5rem" : "12px",
-        padding: isMobile ? "0.5rem 0" : "10px 0",
-        textDecoration: "none",
-        color: "var(--text-color)",
-        fontSize: isMobile ? "0.9rem" : "15px",
-        fontWeight: 500,
-        transition: "all .25s ease",
-        cursor: "pointer",
-      },
-
-      convertArrow: {
-        display: isMobile ? "none" : "block",
-        position: "absolute",
-        top: isMobile ? "auto" : "-9px",
-        bottom: isMobile ? "-7px" : "auto",
-        left: "50%",
-        transform: "translateX(-50%) rotate(45deg)",
-        width: "18px",
-        height: "18px",
-        background: "var(--card-bg)",
-        borderTop: "1px solid var(--border-color)",
-        borderLeft: "1px solid var(--border-color)",
-        zIndex: 10000,
-      },
-    };
+  // Open dropdown immediately & clear close timer
+  const handleMouseEnter = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setShowToolsDropdown(true);
   };
-  
-  const styles = getResponsiveStyles();
+
+  // Graceful debounce on mouse leave (300ms cushion)
+  const handleMouseLeave = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+    }
+    closeTimeoutRef.current = setTimeout(() => {
+      setShowToolsDropdown(false);
+    }, 300);
+  };
+
+  // Close when clicked outside
+  const handleClickOutside = useCallback((e) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      setShowToolsDropdown(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside);
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setShowToolsDropdown(false);
+    };
+    window.addEventListener('keydown', handleEsc);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleEsc);
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    };
+  }, [handleClickOutside]);
+
+  const handleOpenSpotlight = () => {
+    window.dispatchEvent(new CustomEvent('open-spotlight-search'));
+    setIsMobileMenuOpen(false);
+    setShowToolsDropdown(false);
+  };
+
+  // Group tools by category
+  const categorizedTools = CATEGORIES.filter(c => c.id !== 'All').map(cat => ({
+    category: cat,
+    tools: TOOLS.filter(t => t.category === cat.id)
+  }));
 
   return (
-    <header style={styles.header}>
-      <Link to="/" style={styles.brandLink}>
-        <Logo size={32} />
-        <span style={styles.brandText}>The File Peace</span>
-        <span style={styles.badge}>v1.0</span>
-      </Link>
-
-      <button 
-        style={styles.menuToggle}
-        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        aria-label="Toggle menu"
-      >
-        <div style={{
-          ...styles.hamburgerLine,
-          transform: isMobileMenuOpen ? 'rotate(45deg) translateY(12px)' : 'rotate(0)'
-        }} />
-        <div style={{
-          ...styles.hamburgerLine,
-          opacity: isMobileMenuOpen ? '0' : '1'
-        }} />
-        <div style={{
-          ...styles.hamburgerLine,
-          transform: isMobileMenuOpen ? 'rotate(-45deg) translateY(-12px)' : 'rotate(0)'
-        }} />
-      </button>
-
-      <nav style={styles.nav}>
-
-
-        <NavLink
-          to="/merge-pdf"
-          style={({ isActive }) => ({
-    ...styles.navLink,
-    color: isActive ? "var(--primary-color)" : "var(--text-color)",
-    textDecoration: "none",
-  })}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--primary-color)";
-            
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--text-color)";
-            
-          }}
-          onClick={() => setIsMobileMenuOpen(false)}
-        >
-          MERGE PDF
-        </NavLink>
-
-        <NavLink
-          to="/split-pdf"
-           style={({ isActive }) => ({
-    ...styles.navLink,
-    color: isActive ? "var(--primary-color)" : "var(--text-color)",
-    textDecoration: "none",
-  })}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--primary-color)";
-           
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--text-color)";
-        
-          }}
-          onClick={() => setIsMobileMenuOpen(false)}
-        >
-          SPLIT PDF
-        </NavLink>
-
-        <NavLink
-  to="/compress-image"
-  style={({ isActive }) => ({
-    ...styles.navLink,
-    color: isActive ? "var(--primary-color)" : "var(--text-color)",
-    textDecoration: "none",
-  })}
-  onMouseEnter={(e) => {
-    e.currentTarget.style.color = "var(--primary-color)";
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.color = "var(--text-color)";
-  }}
-  onClick={() => setIsMobileMenuOpen(false)}
->
-  COMPRESS IMAGE 
-</NavLink>
-        <div
-          style={styles.dropdown}
-          onMouseEnter={() => setShowConvertDropdown(true)}
-          onMouseLeave={() => setShowConvertDropdown(false)}
-        ><button
-          style={styles.navButton}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--primary-color)";
-           
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--text-color)";
-           
-          }}
-        >
-            CONVERT ▾
-          </button>
-
-          {showConvertDropdown && (
-            <div style={styles.convertMenu}>
-
-
-
-
-              <div style={styles.convertArrow}></div>
-
-              <div style={styles.convertColumn}>
-
-                <h3 style={styles.convertHeading}>
-                  CONVERT TO PDF
-                </h3>
-
-                <Link
-                  to="/image-to-pdf"
-                  
-                  style={styles.convertItem}
-
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "var(--primary-color)";
-                    e.currentTarget.style.transform = "translateX(5px)";
-                  }}
-
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "var(--text-color)";
-                    e.currentTarget.style.transform = "translateX(0)";
-                  }}
-                  onClick={() => {
-                    setShowConvertDropdown(false);
-                    setIsMobileMenuOpen(false);
-                  }}
-                >   <FiImage color="#8b5cf6" size={18} /> Image to PDF</Link>
-                <Link
-                  to="/text-to-pdf"
-                  style={styles.convertItem}
-
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "var(--primary-color)";
-                    e.currentTarget.style.transform = "translateX(5px)";
-                  }}
-
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "var(--text-color)";
-                    e.currentTarget.style.transform = "translateX(0)";
-                  }}
-                  onClick={() => {
-                    setShowConvertDropdown(false);
-                    setIsMobileMenuOpen(false);
-                  }}
-                >   <FiCode color="#ef4444" size={18} /> Text & Code to PDF</Link>
-                <Link
-                  to="/markup-converter"
-                  style={styles.convertItem}
-
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "var(--primary-color)";
-                    e.currentTarget.style.transform = "translateX(5px)";
-                  }}
-
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "var(--text-color)";
-                    e.currentTarget.style.transform = "translateX(0)";
-                  }}
-                  onClick={() => {
-                    setShowConvertDropdown(false);
-                    setIsMobileMenuOpen(false);
-                  }}
-                >   <FiLayout color="#3498db" size={18} /> Markup Converter</Link>
-
-
-
-
-              </div>
-
-              <div style={styles.convertColumn}>
-
-                <h3 style={styles.convertHeading}>
-                  CONVERT FROM PDF
-                </h3>
-                <Link
-                  to="/pdf-to-image"
-                  style={styles.convertItem}
-
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "var(--primary-color)";
-                    e.currentTarget.style.transform = "translateX(5px)";
-                  }}
-
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "var(--text-color)";
-                    e.currentTarget.style.transform = "translateX(0)";
-                  }}
-                  onClick={() => {
-                    setShowConvertDropdown(false);
-                    setIsMobileMenuOpen(false);
-                  }}
-                >  <FiFileText color="#f59e0b" size={18} /> <span>PDF to Image</span></Link>
-
-                <Link
-                  to="/convert-image"
-                  style={styles.convertItem}
-
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "var(--primary-color)";
-                    e.currentTarget.style.transform = "translateX(5px)";
-                  }}
-
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "var(--text-color)";
-                    e.currentTarget.style.transform = "translateX(0)";
-                  }}
-                  onClick={() => {
-                    setShowConvertDropdown(false);
-                    setIsMobileMenuOpen(false);
-                  }}
-                >   <FiImage color="#f97316" size={18} /> Convert Image</Link>
-
-
-              </div>
-
-            </div>
-          )}
-
+    <header className="site-navbar">
+      <div className="navbar-container">
+        {/* 1. Brand Logo */}
+        <div className="navbar-left">
+          <Link to="/" className="brand-link" onClick={() => setIsMobileMenuOpen(false)}>
+            <Logo size={32} />
+            <span className="brand-title">The File Peace</span>
+            <span
+              className="brand-version-badge"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsWhatsNewOpen(true);
+              }}
+              title="What's New in v2.0? Click to view release highlights"
+              style={{ cursor: 'pointer' }}
+            >
+              v2.0
+            </span>
+          </Link>
         </div>
 
-        <div
-          style={styles.dropdown}
-          onMouseEnter={() => setShowDropdown(true)}
-          onMouseLeave={() => setShowDropdown(false)}
-        >
+        {/* 2. Global Spotlight Search Pill (Desktop Center) */}
+        <div className="navbar-center">
           <button
-            style={styles.navButton}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "var(--primary-color)";
-            
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "var(--text-color)";
-           
-            }}
+            type="button"
+            className="spotlight-nav-trigger"
+            onClick={handleOpenSpotlight}
+            aria-label="Open Spotlight Search (Ctrl + K)"
+            title="Press Ctrl+K or / to search tools anywhere"
           >
-            ALL TOOLS ▾
+            <FiSearch className="spotlight-trigger-icon" />
+            <span className="spotlight-trigger-placeholder">Search 40+ offline tools...</span>
+            <span className="spotlight-trigger-shortcut">
+              {isMac ? <FiCommand size={11} style={{ marginRight: 2 }} /> : <span style={{ fontSize: 10, fontWeight: 700, marginRight: 2 }}>Ctrl</span>}
+              <span>K</span>
+            </span>
+          </button>
+        </div>
+
+        {/* 3. Navigation Links & Actions (Right) */}
+        <div className="navbar-right">
+          <nav className="desktop-nav-links">
+            {/* All Tools Mega Dropdown */}
+            <div
+              ref={dropdownRef}
+              className="tools-dropdown-wrapper"
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+            >
+              <button
+                type="button"
+                className={`nav-btn-dropdown ${showToolsDropdown ? 'active' : ''}`}
+                aria-expanded={showToolsDropdown}
+                onClick={() => setShowToolsDropdown((prev) => !prev)}
+              >
+                <FiGrid size={15} />
+                <span>All Tools</span>
+                <FiChevronDown size={14} className={`dropdown-chevron ${showToolsDropdown ? 'rotated' : ''}`} />
+              </button>
+
+              {showToolsDropdown && (
+                <div
+                  className="mega-menu-popover"
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  <div className="mega-menu-grid">
+                    {categorizedTools.map(({ category, tools }) => (
+                      <div key={category.id} className="mega-menu-column">
+                        <div className="mega-menu-category-title">
+                          <span>{category.label}</span>
+                        </div>
+                        <div className="mega-menu-items-list">
+                          {tools.map((tool) => {
+                            const Icon = tool.icon;
+                            return (
+                              <Link
+                                key={tool.title}
+                                to={tool.to}
+                                className="mega-menu-item"
+                                onClick={() => setShowToolsDropdown(false)}
+                              >
+                                <div className="mega-menu-icon-wrap" style={{ color: tool.iconColor }}>
+                                  <Icon size={16} />
+                                </div>
+                                <span className="mega-menu-item-text">{tool.title}</span>
+                                {tool.badge && (
+                                  <span className="mega-menu-badge">{tool.badge}</span>
+                                )}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <NavLink
+              to="/workflow-builder"
+              className={({ isActive }) => `nav-link-item ${isActive ? 'active' : ''}`}
+            >
+              <FiZap size={15} />
+              <span>Pipelines</span>
+            </NavLink>
+
+            <NavLink
+              to="/blog"
+              className={({ isActive }) => `nav-link-item ${isActive ? 'active' : ''}`}
+            >
+              <FiBookOpen size={15} />
+              <span>Blog</span>
+            </NavLink>
+
+            <NavLink
+              to="/changelog"
+              className={({ isActive }) => `nav-link-item ${isActive ? 'active' : ''}`}
+            >
+              <FiTag size={15} />
+              <span>Changelog</span>
+            </NavLink>
+          </nav>
+
+          {/* Theme Toggle Button */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="theme-toggle-btn"
+            title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            aria-label="Toggle dark/light theme"
+          >
+            {theme === 'light' ? '🌙' : '☀️'}
           </button>
 
-          {showDropdown && (
-            <div style={styles.megaMenu}>
-              <div style={styles.arrow}></div>
-              {toolCategories.map((category) => (
-                <div key={category.title} style={styles.megaColumn}>
-                  <h3 style={styles.megaHeading}>{category.title}</h3>
+          {/* Mobile Menu Toggle */}
+          <button
+            type="button"
+            className="mobile-menu-toggle-btn"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label={isMobileMenuOpen ? 'Close Menu' : 'Open Menu'}
+          >
+            {isMobileMenuOpen ? <FiX size={22} /> : <FiMenu size={22} />}
+          </button>
+        </div>
+      </div>
 
-                  {category.tools.map((tool) => {
-  const Icon = tool.icon;
+      {/* Mobile Drawer */}
+      {isMobileMenuOpen && (
+        <div className="mobile-nav-drawer">
+          <div className="mobile-search-trigger-wrap">
+            <button
+              type="button"
+              className="mobile-spotlight-btn"
+              onClick={handleOpenSpotlight}
+            >
+              <FiSearch size={16} />
+              <span>Search 40+ offline tools...</span>
+              <span className="mobile-shortcut-badge">Ctrl+K</span>
+            </button>
+          </div>
 
-  return (
-    <Link
-      key={tool.title}
-      to={tool.to}
-      style={styles.megaItem}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.color = "#3b82f6";
-        e.currentTarget.style.transform = "translateX(6px)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.color = "var(--text-color)";
-        e.currentTarget.style.transform = "translateX(0)";
-      }}
-      onClick={() => {
-        setShowDropdown(false);
-        setIsMobileMenuOpen(false);
-      }}
-    >
-      <Icon
-        size={18}
-        color={tool.iconColor}
-        style={{ flexShrink: 0 }}
-      />
+          <div className="mobile-nav-links-list">
+            <NavLink
+              to="/"
+              end
+              className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <FiGrid size={18} />
+              <span>Home & All Tools</span>
+            </NavLink>
 
-      <span>{tool.title}</span>
-    </Link>
-  );
-})}
+            <NavLink
+              to="/workflow-builder"
+              className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <FiZap size={18} />
+              <span>Workflow Pipeline Builder</span>
+            </NavLink>
+
+            <NavLink
+              to="/blog"
+              className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <FiBookOpen size={18} />
+              <span>Blog &amp; Guides</span>
+            </NavLink>
+
+            <NavLink
+              to="/changelog"
+              className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <FiTag size={18} />
+              <span>Release Changelog</span>
+            </NavLink>
+          </div>
+
+          <div className="mobile-categories-section">
+            <h4 className="mobile-categories-heading">Explore Tools by Category</h4>
+            <div className="mobile-categories-grid">
+              {categorizedTools.map(({ category, tools }) => (
+                <div key={category.id} className="mobile-category-block">
+                  <div className="mobile-category-name">{category.label}</div>
+                  <div className="mobile-category-items">
+                    {tools.map((tool) => (
+                      <Link
+                        key={tool.title}
+                        to={tool.to}
+                        className="mobile-tool-item"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <tool.icon size={15} color={tool.iconColor} />
+                        <span>{tool.title}</span>
+                      </Link>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
-          )}
+          </div>
         </div>
-      </nav>
+      )}
 
-      <button onClick={toggleTheme} style={styles.themeBtn}>
-        {theme === "light" ? "🌙 Dark" : "☀️ Light"}
-      </button>
+      {/* What's New Update Modal */}
+      <WhatsNewModal
+        isOpen={isWhatsNewOpen}
+        onClose={() => setIsWhatsNewOpen(false)}
+      />
     </header>
   );
 };

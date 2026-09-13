@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+~$*
+
+# Private local remediation roadmap
+local_tracker.md
+RULES_FOR_AGENT.md
+AGENTS.md
+.gemini/
+.agents/
+scripts/

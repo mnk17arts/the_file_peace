@@ -1,47 +1,78 @@
 import { useState, useEffect } from 'react';
 
-const Loader = ({ isLoading, progress = null, phrases = [] }) => {
-  const defaultPhrases = [
-    "Compiling the layout...",
-    "Shaving off excess megabytes...",
-    "Applying pure digital magic...",
-    "Organizing data particles...",
-    "Almost there, finalizing files..."
-  ];
+const Loader = ({
+  isLoading = true,
+  message = null,
+  progress = null,
+  phrases = [],
+  onCancel = null
+}) => {
+  const defaultPhrases = message
+    ? [message]
+    : [
+        "Compiling the layout...",
+        "Shaving off excess megabytes...",
+        "Applying pure digital magic...",
+        "Organizing data particles...",
+        "Almost there, finalizing files..."
+      ];
 
   // Use custom phrases if passed, otherwise fallback to defaults
   const loadingPhrases = phrases.length > 0 ? phrases : defaultPhrases;
-  const [currentPhrase, setCurrentPhrase] = useState(loadingPhrases[0]);
+  const [phraseIndex, setPhraseIndex] = useState(0);
 
   useEffect(() => {
-    if (!isLoading) return;
+    if (message || !isLoading) return;
 
-    let index = 0;
     const interval = setInterval(() => {
-      index = (index + 1) % loadingPhrases.length;
-      setCurrentPhrase(loadingPhrases[index]);
-    }, 2500); // Changes wording every 2.5 seconds
+      setPhraseIndex((prev) => (prev + 1) % loadingPhrases.length);
+    }, 2500);
 
     return () => clearInterval(interval);
-  }, [isLoading, loadingPhrases]);
+  }, [isLoading, loadingPhrases, message]);
 
   if (!isLoading) return null;
 
+  const currentPhrase = message || loadingPhrases[phraseIndex] || loadingPhrases[0];
+
   return (
-    <div style={styles.overlay}>
+    <div 
+      style={styles.overlay} 
+      role="dialog" 
+      aria-modal="true" 
+      aria-live="polite"
+      aria-label="Processing operation"
+    >
       <div style={styles.card}>
         {/* Animated Spinner */}
-        <div style={styles.spinner}></div>
+        <div style={styles.spinner} aria-hidden="true" />
         
         {/* Dynamic Phrase */}
         <p style={styles.phrase}>{currentPhrase}</p>
         
         {/* Optional Progress Bar (For things like Video/Audio processing) */}
         {progress !== null && (
-          <div style={styles.progressContainer}>
-            <div style={{ ...styles.progressBar, width: `${progress}%` }}></div>
+          <div 
+            style={styles.progressContainer}
+            role="progressbar"
+            aria-valuenow={progress}
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <div style={{ ...styles.progressBar, width: `${progress}%` }} />
             <span style={styles.progressText}>{progress}%</span>
           </div>
+        )}
+
+        {/* Optional Cancellation action */}
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            style={styles.cancelBtn}
+            type="button"
+          >
+            Cancel Operation
+          </button>
         )}
       </div>
     </div>
@@ -55,22 +86,23 @@ const styles = {
     left: 0,
     width: '100vw',
     height: '100vh',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Dims the background
-    backdropFilter: 'blur(4px)', // Soft blur effect
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backdropFilter: 'blur(4px)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 9999, // Stays on top of everything
+    zIndex: 9999,
   },
   card: {
     backgroundColor: 'var(--card-bg)',
     padding: '2.5rem',
     borderRadius: '12px',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+    border: '1px solid var(--border-color)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    maxWidth: '400px',
+    maxWidth: '420px',
     width: '90%',
     textAlign: 'center',
   },
@@ -84,7 +116,7 @@ const styles = {
     marginBottom: '1.5rem',
   },
   phrase: {
-    fontSize: '1.1rem',
+    fontSize: '1.05rem',
     fontWeight: '500',
     color: 'var(--text-color)',
     margin: '0 0 1rem 0',
@@ -93,14 +125,15 @@ const styles = {
     width: '100%',
     backgroundColor: 'var(--bg-color)',
     borderRadius: '8px',
-    height: '16px',
+    height: '18px',
     position: 'relative',
     overflow: 'hidden',
     marginTop: '0.5rem',
+    border: '1px solid var(--border-color)',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: 'var(--accent-color)', // Using your neon green for completion tracking
+    backgroundColor: 'var(--accent-color)',
     transition: 'width 0.3s ease',
   },
   progressText: {
@@ -112,9 +145,20 @@ const styles = {
     transform: 'translate(-50%, -50%)',
     fontSize: '0.75rem',
     fontWeight: 'bold',
-    color: '#0f172a', // Always dark text for visibility inside progress bar
+    color: '#0f172a',
+  },
+  cancelBtn: {
+    marginTop: '1.5rem',
+    padding: '0.5rem 1.25rem',
+    backgroundColor: 'transparent',
+    color: 'var(--text-color)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '0.88rem',
+    fontWeight: '500',
+    transition: 'all 0.2s',
   }
 };
 
-// Add raw keyframes to index.css if you don't already have a spinner animation
 export default Loader;

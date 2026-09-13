@@ -1,54 +1,110 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { marked } from 'marked';
-import { FiCode, FiLayout, FiDownload, FiRefreshCw, FiEye } from 'react-icons/fi';
-import FileUpload from '../components/FileUpload';
+import { FiCode, FiEye, FiDownload } from 'react-icons/fi';
+import { ToolHeroView, ToolStudioHeader } from '../components/studio';
+import { consumeTransferredFile } from '../utils/fileTransfer';
+import { formatFileSize } from '../utils/fileUtils';
 
-const MarkupConverter = () => {
+const imagePlaceholderUrl =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180" fill="none"><rect width="320" height="180" rx="8" fill="%231e293b"/><path d="M48 132L108 72L168 132" stroke="%2338bdf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M148 132L188 92L236 132" stroke="%2338bdf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="212" cy="68" r="14" fill="%2338bdf8"/><text x="160" y="156" fill="%2394a3b8" font-family="sans-serif" font-size="12" text-anchor="middle">External Image Preview Blocked (Privacy)</text></svg>';
+
+const preparePreviewHtml = (htmlContent) => {
+  if (typeof window === 'undefined' || !htmlContent) {
+    return htmlContent || '';
+  }
+
+  const parser = new DOMParser();
+  const documentFragment = parser.parseFromString(htmlContent, 'text/html');
+
+  // Strip inline active executable content from markup preview
+  documentFragment.querySelectorAll('script, iframe, object, embed').forEach((node) => node.remove());
+
+  // Replace external images with privacy-preserving SVG placeholder in preview only
+  documentFragment.querySelectorAll('img').forEach((image) => {
+    const originalAlt = image.getAttribute('alt') || '';
+    image.setAttribute('src', imagePlaceholderUrl);
+    image.removeAttribute('srcset');
+    image.setAttribute('alt', originalAlt ? `${originalAlt} (preview unavailable)` : 'Image preview unavailable');
+    image.setAttribute('width', image.getAttribute('width') || '320');
+    image.setAttribute('height', image.getAttribute('height') || '180');
+    image.style.maxWidth = '100%';
+    image.style.height = 'auto';
+  });
+
+  return documentFragment.body.innerHTML;
+};
+
+export default function MarkupConverter() {
+  const location = useLocation();
+  const handledRef = useRef(false);
   const [fileData, setFileData] = useState(null);
   const [viewMode, setViewMode] = useState('preview'); // 'source' or 'preview'
   const [renderedHtml, setRenderedHtml] = useState('');
+  const [rawHtml, setRawHtml] = useState('');
 
-  const handleFileLoad = (files) => {
-    if (files.length !== 1) return;
+  const handleFileLoad = useCallback((files) => {
+    if (!files || files.length !== 1) return;
     const file = files[0];
     const ext = file.name.split('.').pop().toLowerCase();
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = e.target.result;
-      
-      let htmlOutput = '';
-      
+      let htmlOutput;
+
       // 1. Markdown Formats: Parse with marked
       if (['md', 'markdown', 'mdx'].includes(ext)) {
         htmlOutput = marked.parse(content);
-      } 
+      }
       // 2. Native Web Formats: The browser can render these directly
       else if (['html', 'htm', 'xml', 'svg'].includes(ext)) {
         htmlOutput = content;
-      } 
-      // 3. Graceful Fallback: Wrap unsupported/plain text formats in a clean pre-formatted block
+      }
+      // 3. Graceful Fallback: Wrap plain text in a clean pre-formatted block
       else {
         htmlOutput = `
           <div style="background-color: #f8f9fa; padding: 1.5rem; border-radius: 8px; border: 1px solid #e9ecef;">
             <p style="color: #6c757d; font-size: 0.85rem; margin-top: 0; margin-bottom: 1rem; border-bottom: 1px solid #dee2e6; padding-bottom: 0.5rem;">
               <em>Rendered as plain text (Native visual parsing not supported for .${ext})</em>
             </p>
-            <pre style="white-space: pre-wrap; word-wrap: break-word; font-family: monospace; font-size: 14px; margin: 0; color: #333;">${
-              // Escape HTML tags so they don't accidentally execute in the fallback view
-              content.replace(/</g, "&lt;").replace(/>/g, "&gt;")
-            }</pre>
+            <pre style="white-space: pre-wrap; word-wrap: break-word; font-family: monospace; font-size: 14px; margin: 0; color: #333;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
           </div>
         `;
       }
 
-      setFileData({ name: file.name, content, originalType: file.type || 'text/plain' });
-      setRenderedHtml(htmlOutput);
+      setFileData({ name: file.name, size: file.size, content, originalType: file.type || 'text/plain' });
+      setRawHtml(htmlOutput);
+      setRenderedHtml(preparePreviewHtml(htmlOutput));
     };
     reader.readAsText(file);
-  };
+  }, []);
+
+  // Handle incoming file piped from another tool
+  useEffect(() => {
+    if (handledRef.current) return;
+    const inc = consumeTransferredFile() || location.state?.incomingFile;
+    if (inc) {
+      handledRef.current = true;
+      setTimeout(() => {
+        handleFileLoad([inc]);
+      }, 0);
+    }
+  }, [handleFileLoad, location.state]);
+
+  // Uploaded markup is rendered in an opaque-origin, script-free document for privacy
+  const previewDocument = `<!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src 'none'; connect-src 'none'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'">
+        <style>body { margin: 0; padding: 2rem; font-family: system-ui, sans-serif; color: #333; } img { max-width: 100%; height: auto; } pre { white-space: pre-wrap; overflow-wrap: anywhere; }</style>
+      </head>
+      <body>${renderedHtml}</body>
+    </html>`;
 
   const downloadSource = () => {
+    if (!fileData) return;
     const blob = new Blob([fileData.content], { type: fileData.originalType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -59,29 +115,27 @@ const MarkupConverter = () => {
   };
 
   const downloadRenderedHtml = () => {
-    // Wrap the rendered content in a basic HTML boilerplate for proper offline viewing
-    const fullHtmlTemplate = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${fileData.name.split('.')[0]} - Rendered</title>
-        <style>
-          body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 2rem; color: #333; }
-          img { max-width: 100%; height: auto; }
-          pre, code { background: #f4f4f4; padding: 0.2rem 0.4rem; border-radius: 4px; font-family: monospace; }
-          pre { padding: 1rem; overflow-x: auto; }
-          table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #f2f2f2; }
-        </style>
-      </head>
-      <body>
-        ${renderedHtml}
-      </body>
-      </html>
-    `;
+    if (!fileData) return;
+    const fullHtmlTemplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${fileData.name.split('.')[0]} - Rendered</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 2rem; color: #333; }
+    img { max-width: 100%; height: auto; }
+    pre, code { background: #f4f4f4; padding: 0.2rem 0.4rem; border-radius: 4px; font-family: monospace; }
+    pre { padding: 1rem; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+  </style>
+</head>
+<body>
+  ${rawHtml}
+</body>
+</html>`;
 
     const blob = new Blob([fullHtmlTemplate], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
@@ -92,89 +146,214 @@ const MarkupConverter = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleReset = () => {
+    setFileData(null);
+    setRenderedHtml('');
+    setRawHtml('');
+    setViewMode('preview');
+  };
+
+  // -------------------------------------------------------------
+  // VIEW 1: HERO VIEW (Empty state)
+  // -------------------------------------------------------------
+  if (!fileData) {
+    return (
+      <ToolHeroView
+        title="Markup & Document Converter"
+        description="Render, preview, and convert Markdown, HTML, XML, and SVG formats directly in your browser with privacy sandboxing."
+        badge="Markup Studio"
+        badgeIcon={FiCode}
+        toolPath="/markup-converter"
+        onFilesSelected={handleFileLoad}
+        accept={{
+          'text/markdown': ['.md', '.markdown', '.mdx'],
+          'text/html': ['.html', '.htm'],
+          'text/xml': ['.xml', '.svg'],
+          'text/plain': ['.txt'],
+        }}
+        multiple={false}
+        uploadTitle="Drop any Markdown, HTML, XML, or SVG file here"
+        uploadDescription="Converts and formats documents client-side"
+        formatBadges={['.MD', '.HTML', '.XML', '.SVG', '.TXT']}
+        acceptedFormats={['.md', '.html', '.xml', '.svg', '.txt']}
+        singleFileOnly={true}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // VIEW 2: TYPE-B SINGLE-COLUMN FOCUS STUDIO
+  // -------------------------------------------------------------
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', height: '85vh' }}>
-      <h2 style={{ textAlign: 'center', marginBottom: '1rem' }}>Markup Previewer & Converter</h2>
-
-      {!fileData ? (
-        <FileUpload 
-          onFilesSelected={handleFileLoad} 
-          accept={{ 'text/*': ['.md', '.markdown', '.mdx', '.html', '.htm', '.xml', '.svg', '.txt', '.adoc', '.rst'] }} 
-          multiple={false} 
-          title="Drop Markdown, HTML, XML, or Text files here"
-        />
-      ) : (
-        <div style={styles.workspace}>
-          {/* Header Controls */}
-          <div style={styles.header}>
-            <div style={styles.titleArea}>
-              <span style={styles.fileName}>{fileData.name}</span>
-              <div style={styles.toggleGroup}>
-                <button 
-                  onClick={() => setViewMode('source')} 
-                  style={viewMode === 'source' ? styles.activeToggle : styles.inactiveToggle}
-                >
-                  <FiCode /> Source
-                </button>
-                <button 
-                  onClick={() => setViewMode('preview')} 
-                  style={viewMode === 'preview' ? styles.activeToggle : styles.inactiveToggle}
-                >
-                  <FiEye /> Rendered
-                </button>
-              </div>
-            </div>
-            
-            <div style={styles.actionGroup}>
-              <button onClick={downloadSource} style={styles.secondaryBtn} title="Download Original File">
-                <FiDownload /> Source
-              </button>
-              <button onClick={downloadRenderedHtml} style={styles.primaryBtn} title="Download Compiled HTML File">
-                <FiLayout /> Rendered HTML
-              </button>
-              <button onClick={() => setFileData(null)} style={styles.resetBtn}>
-                <FiRefreshCw />
-              </button>
-            </div>
+    <div
+      style={{
+        height: 'calc(100vh - 72px)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        background: 'var(--bg-color)',
+      }}
+    >
+      {/* Top 48px Micro Bar */}
+      <ToolStudioHeader
+        icon={FiCode}
+        title="Markup & Document Converter"
+        fileBadge={`${fileData.name} • ${formatFileSize(fileData.size || 0)}`}
+        onReset={handleReset}
+        resetLabel="Change File"
+        headerExtra={
+          <div
+            style={{
+              display: 'inline-flex',
+              background: 'var(--subtle-bg)',
+              padding: '0.2rem',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              gap: '0.25rem',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode('preview')}
+              style={{
+                padding: '0.3rem 0.75rem',
+                borderRadius: '6px',
+                border: 'none',
+                background: viewMode === 'preview' ? 'var(--primary-color)' : 'transparent',
+                color: viewMode === 'preview' ? '#fff' : 'var(--text-color)',
+                fontWeight: 700,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+            >
+              <FiEye size={13} /> Visual Preview
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('source')}
+              style={{
+                padding: '0.3rem 0.75rem',
+                borderRadius: '6px',
+                border: 'none',
+                background: viewMode === 'source' ? 'var(--primary-color)' : 'transparent',
+                color: viewMode === 'source' ? '#fff' : 'var(--text-color)',
+                fontWeight: 700,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+            >
+              <FiCode size={13} /> Raw Source
+            </button>
           </div>
+        }
+        actionButton={
+          <button
+            type="button"
+            className="btn-primary studio-header-action-btn"
+            onClick={downloadRenderedHtml}
+          >
+            <FiDownload size={14} />
+            <span>Download HTML</span>
+          </button>
+        }
+      />
 
-          {/* Viewer Area */}
-          <div style={styles.viewerContainer}>
-            {viewMode === 'source' ? (
-              <textarea 
-                readOnly 
-                value={fileData.content} 
-                style={styles.sourceViewer}
-              />
-            ) : (
-              <div 
-                className="markdown-body" 
-                style={styles.renderedViewer}
-                dangerouslySetInnerHTML={{ __html: renderedHtml }} 
-              />
-            )}
-          </div>
+      {/* Main Single-Column Document Viewport (100% height, zero outer window scroll) */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--card-bg)',
+        }}
+      >
+        {viewMode === 'preview' ? (
+          <iframe
+            title="Secure Rendered Preview"
+            srcDoc={previewDocument}
+            sandbox="allow-same-origin"
+            referrerPolicy="no-referrer"
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              background: '#ffffff',
+            }}
+          />
+        ) : (
+          <pre
+            style={{
+              margin: 0,
+              padding: '1.5rem',
+              fontFamily: 'monospace',
+              fontSize: '0.9rem',
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+              color: 'var(--text-color)',
+              background: 'var(--subtle-bg)',
+              height: '100%',
+              overflowY: 'auto',
+            }}
+          >
+            {fileData.content}
+          </pre>
+        )}
+      </div>
+
+      {/* Bottom Quick Action Ribbon */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '0.65rem 1.25rem',
+          borderTop: '1px solid var(--border-color)',
+          background: 'var(--bg-color)',
+          flexShrink: 0,
+        }}
+      >
+        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+          Format: <strong>{fileData.name.split('.').pop().toUpperCase()}</strong> • 🔒 Content-Security-Policy Sandboxed
+        </span>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={downloadSource}
+            className="btn-secondary"
+            style={{
+              padding: '0.4rem 0.85rem',
+              fontSize: '0.82rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+            }}
+          >
+            <FiDownload size={13} /> Download Original
+          </button>
+          <button
+            type="button"
+            onClick={downloadRenderedHtml}
+            className="btn-primary"
+            style={{
+              padding: '0.4rem 1rem',
+              fontSize: '0.82rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+            }}
+          >
+            <FiDownload size={13} /> Download Rendered HTML
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
-};
-
-const styles = {
-  workspace: { display: 'flex', flexDirection: 'column', flexGrow: 1, backgroundColor: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', backgroundColor: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' },
-  titleArea: { display: 'flex', alignItems: 'center', gap: '1.5rem' },
-  fileName: { fontWeight: 'bold', color: 'var(--text-color)', fontSize: '1.1rem' },
-  toggleGroup: { display: 'flex', backgroundColor: 'var(--card-bg)', borderRadius: '6px', border: '1px solid var(--border-color)', overflow: 'hidden' },
-  activeToggle: { display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' },
-  inactiveToggle: { display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: 'transparent', color: 'var(--text-color)', border: 'none', cursor: 'pointer' },
-  actionGroup: { display: 'flex', gap: '0.75rem' },
-  primaryBtn: { display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: '#2ed573', color: '#0f172a', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' },
-  secondaryBtn: { display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: 'transparent', color: 'var(--text-color)', border: '1px solid var(--border-color)', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' },
-  resetBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.5rem', backgroundColor: '#ff4757', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-  viewerContainer: { flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
-  sourceViewer: { flexGrow: 1, padding: '1.5rem', border: 'none', backgroundColor: '#1e1e1e', color: '#d4d4d4', fontFamily: 'monospace', fontSize: '14px', resize: 'none', outline: 'none' },
-  renderedViewer: { flexGrow: 1, padding: '2rem', overflowY: 'auto', backgroundColor: '#ffffff', color: '#333333' }
-};
-
-export default MarkupConverter;
+}
