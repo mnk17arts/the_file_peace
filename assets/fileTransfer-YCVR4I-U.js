@@ -1,0 +1,1 @@
+var e=null,t=t=>{e=t},n=()=>{let t=e;return e=null,t};export{t as n,n as t};

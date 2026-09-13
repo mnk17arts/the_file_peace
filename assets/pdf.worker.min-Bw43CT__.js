@@ -1,0 +1,1 @@
+var e=`/the_file_peace/assets/pdf.worker.min-FHbmGBN0.mjs`;export{e as t};
